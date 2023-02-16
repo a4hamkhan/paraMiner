@@ -1,59 +1,35 @@
 import argparse
 import re
-import sys
 import subprocess
+import json
 
-logo = '''
-                         $$\   $$\                     $$\                        
-                         $$ |  $$ |                    $$ |                       
-  $$$$$$\  $$$$$$\$$$$\  $$ |  $$ |$$\   $$\ $$$$$$$\$$$$$$\   $$$$$$\   $$$$$$\  
- $$  __$$\ $$  _$$  _$$\ $$$$$$$$ |$$ |  $$ |$$  __$$\_$$  _| $$  __$$\ $$  __$$\ 
- $$ /  $$ |$$ / $$ / $$ |$$  __$$ |$$ |  $$ |$$ |  $$ |$$ |   $$$$$$$$ |$$ |  \__|
- $$ |  $$ |$$ | $$ | $$ |$$ |  $$ |$$ |  $$ |$$ |  $$ |$$ |$$\$$   ____|$$ |      
- $$$$$$$  |$$ | $$ | $$ |$$ |  $$ |\$$$$$$  |$$ |  $$ |\$$$$  \$$$$$$$\ $$ |      
- $$  ____/ \__| \__| \__|\__|  \__| \______/ \__|  \__| \____/ \_______|\__|      
- $$ |                                                                             
- $$ | Name   : Para Hunter                                                                            
- \__| Author : github.com/pwnesec  
-      
- '''
-
+# Create argument parser
 parser = argparse.ArgumentParser()
 parser.add_argument('--url', required=True, help='URL to crawl')
-parser.add_argument('--verbose', action='store_true', help='Print verbose output')
-parser.add_argument('--json', action='store_true', help='Print output in JSON format')
+parser.add_argument('--verbose', action='store_true', help='Print parameter names')
+parser.add_argument('--json', action='store_true', help='Output parameters in JSON format')
 
-if len(sys.argv) == 1:
-    print(logo)
-    parser.print_help(sys.stderr)
-    sys.exit(1)
-
+# Parse arguments
 args = parser.parse_args()
 
+# Run curl command and capture output
+curl_output = subprocess.check_output(['curl', '-s', args.url, '--insecure'])
+
+# Decode output to string
+curl_output_str = curl_output.decode()
+
+# Use regular expression to extract name attributes
+name_values = re.findall('<input[^>]*\sname=[\'"]?([^\'" >]+)[^>]*>', curl_output_str)
+
+# Print name values if verbose flag is set
 if args.verbose:
-    print("Verbose mode enabled")
+    for name in name_values:
+        print(f'Parameter found: {name}')
 
-if args.json:
-    print("JSON output enabled")
-
-curl_command = f"curl -s {args.url} --insecure"
-curl_output = subprocess.check_output(curl_command, shell=True).decode('utf-8')
-input_elements = [line for line in curl_output.split('\n') if '<input' in line and 'name=' in line]
-parameters = []
-for element in input_elements:
-    matches = re.findall('name="([^"]*)"', element)
-    if matches:
-        parameter_name = matches[0]
-        parameters.append(parameter_name)
-        if args.verbose:
-            print(f"Parameter found: {parameter_name}")
-
-if not parameters:
-    print("No parameters found")
+# Otherwise, just print the number of parameters found, or output in JSON format if --json flag is set
 else:
     if args.json:
-        print({"parameters": parameters})
+        parameter_dict = {f'parameter_{i}': name for i, name in enumerate(name_values)}
+        print(json.dumps(parameter_dict))
     else:
-        print("Found parameters:")
-        for parameter in parameters:
-            print(f"Parameter found: {parameter}")
+        print(f'Found {len(name_values)} parameters')
